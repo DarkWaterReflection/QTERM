@@ -733,6 +733,20 @@ ${isRisk ? '\n⚠ RISK MODE: Provide quantitative metrics, formulas, limitations
 // ═══════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════
+const FINNHUB_KEY = 'd6k5ta9r01qko8c3hfpgd6k5ta9r01qko8c3hfq0';
+
+const SYMBOL_MAP = {
+  'SPX': 'SPY', 'NDX': 'QQQ', 'DJIA': 'DIA', 'RUT': 'IWM',
+  'AAPL': 'AAPL', 'NVDA': 'NVDA', 'MSFT': 'MSFT', 'AMZN': 'AMZN',
+  'GOOGL': 'GOOGL', 'META': 'META', 'TSLA': 'TSLA', 'BRK.B': 'BRK.B',
+  'JPM': 'JPM', 'GS': 'GS', 'V': 'V',
+  'EUR/USD': 'FX:EURUSD', 'GBP/USD': 'FX:GBPUSD', 'USD/JPY': 'FX:USDJPY',
+  'USD/CNY': 'FX:USDCNY', 'AUD/USD': 'FX:AUDUSD', 'USD/CHF': 'FX:USDCHF',
+  'USD/CAD': 'FX:USDCAD', 'USD/MXN': 'FX:USDMXN',
+  'GOLD': 'FX:XAUUSD', 'SILVER': 'FX:XAGUSD', 'WTI': 'USO', 'BRENT': 'BNO',
+  'BTC': 'BINANCE:BTCUSDT', 'ETH': 'BINANCE:ETHUSDT', 'SOL': 'BINANCE:SOLUSDT', 'BNB': 'BINANCE:BNBUSDT'
+};
+
 export default function App() {
   const [view, setView] = useState('overview');
   const [cmd, setCmd] = useState('');
@@ -741,23 +755,57 @@ export default function App() {
   const [fx, setFx] = useState(mkFX);
   const [comm, setComm] = useState(mkComm);
   const [crypto, setCrypto] = useState(mkCrypto);
+  const [isUpdating, setIsUpdating] = useState(false);
   const cmdRef = useRef(null);
 
-  // Clock + live data
+  // Real-time market data fetcher
+  const fetchAllMarketData = useCallback(async () => {
+    if (isUpdating) return;
+    setIsUpdating(true);
+    
+    const fetchItem = async (item) => {
+      const finnSymbol = SYMBOL_MAP[item.sym] || item.sym;
+      try {
+        const resp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${finnSymbol}&token=${FINNHUB_KEY}`);
+        const d = await resp.json();
+        if (d && d.c) {
+          return { ...item, p: d.c, c: d.dp };
+        }
+      } catch (e) {
+        console.error(`Failed to fetch ${item.sym}:`, e);
+      }
+      return item;
+    };
+
+    try {
+      // Fetch in batches to be efficient
+      const newEq = await Promise.all(eq.map(fetchItem));
+      setEq(newEq);
+      const newFx = await Promise.all(fx.map(fetchItem));
+      setFx(newFx);
+      const newComm = await Promise.all(comm.map(fetchItem));
+      setComm(newComm);
+      const newCrypto = await Promise.all(crypto.map(fetchItem));
+      setCrypto(newCrypto);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [eq, fx, comm, crypto, isUpdating]);
+
+  // Clock + live data updates
   useEffect(() => {
     const tick = setInterval(() => {
       const now = new Date();
       const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
       setTime(`${String(est.getHours()).padStart(2,'0')}:${String(est.getMinutes()).padStart(2,'0')}:${String(est.getSeconds()).padStart(2,'0')} EST`);
-      if (est.getSeconds() % 3 === 0) {
-        setEq(prev => prev.map(s => ({ ...s, p: jitter(s.p, 0.002), c: parseFloat((s.c + (Math.random()-0.5)*0.05).toFixed(2)) })));
-        setFx(prev => prev.map(s => ({ ...s, p: jitter(s.p, 0.001), c: parseFloat((s.c + (Math.random()-0.5)*0.02).toFixed(2)) })));
-        setComm(prev => prev.map(s => ({ ...s, p: jitter(s.p, 0.003), c: parseFloat((s.c + (Math.random()-0.5)*0.05).toFixed(2)) })));
-        setCrypto(prev => prev.map(s => ({ ...s, p: jitter(s.p, 0.005), c: parseFloat((s.c + (Math.random()-0.5)*0.1).toFixed(2)) })));
+      
+      // Update data every 30 seconds
+      if (now.getSeconds() % 30 === 0) {
+        fetchAllMarketData();
       }
     }, 1000);
     return () => clearInterval(tick);
-  }, []);
+  }, [fetchAllMarketData]);
 
   // Keyboard shortcut
   useEffect(() => {

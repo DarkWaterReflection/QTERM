@@ -1,26 +1,16 @@
-# QTERM
+# React + Vite
 
-**QTERM** is an elite Quantitative Finance Analysis Engine and Market Dashboard. It provides a comprehensive, terminal-style heads-up display (HUD) for real-time market data monitoring, macroeconomic indicators, geopolitical risk assessment, and an integrated AI analysis assistant for quantitative finance.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## 🚀 Features
+Currently, two official plugins are available:
 
-- **Live Market Data:** Real-time simulated price updates for Equities, FX, Commodities, and Crypto.
-- **Macro & Geo-Risk Monitoring:** Track macroeconomic releases (CPI, GDP, Fed Funds) and geopolitical risk scores.
-- **Fixed Income & Spreads:** Monitor yield curves, credit spreads, and SOFR/LIBOR rates.
-- **Options & Derivatives:** Visualize options chains, Greeks (Delta, Gamma), and Implied Volatility (IV).
-- **AI Quant Assistant:** An integrated Anthropic Claude-powered AI assistant capable of mathematical reasoning, strategy design (mean reversion, momentum), risk management (VaR, CVaR), and generating Python code for quant models.
-- **Order Flow & Sectors:** Analyze buy/sell pressure and sector performance.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## 💻 Tech Stack
+## React Compiler
 
-- **React:** Built with modern React Hooks (`useState`, `useEffect`, `useRef`, `useCallback`).
-- **Anthropic Claude API:** Powers the sophisticated AI analysis engine.
-- **Custom UI:** Custom CSS animations, dynamic theming, and a retro-futuristic hacker terminal aesthetic.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## 🛠️ Usage
+## Expanding the ESLint configuration
 
-Simply select a category or type a question into the QTERM command prompt to interact with the analysis engine. The UI allows you to switch between various views:
-
-- *Overview / Markets / Macro / Geo-Risk / Derivatives / Fixed Income / Order Flow / AI Analysis*
-
-To ask the AI a question, you can click on any populated questions in the interface or type specific directives like "Code Mode" or "Math Mode" to adjust output formatting on the fly.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
