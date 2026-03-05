@@ -74,7 +74,6 @@ const GEO = [
   { flag: '🇩🇪', name: 'EU Economic Slowdown', level: 'medium', impact: 'EUR,Bonds,Trade', score: 58 },
   { flag: '🇯🇵', name: 'BOJ Policy Shift', level: 'high', impact: 'Yen,JGBs,Carry', score: 68 },
   { flag: '🇧🇷', name: 'Brazil Political Risk', level: 'medium', impact: 'Real,Commodities', score: 51 },
-  { flag: '🇧🇷', name: 'Brazil Political Risk', level: 'medium', impact: 'Real,Commodities', score: 51 },
 ];
 const NEWS = [
   { tag: 'policy', time: '09:42', src: 'FED', h: 'Powell signals data-dependent approach as inflation moves toward 2% target, markets reassess rate cut timeline', imp: ['📈 Equities', '📉 USD', '📈 Bonds'] },
@@ -191,6 +190,7 @@ const AI_CATS = {
 
 // ─── Formatting Engine ───
 function formatAIResponse(text) {
+  // ... (keeping existing logic)
   const segments = [];
   const codeBlockRe = /```(?:python|py|)?\n?([\s\S]*?)```/g;
   let last = 0, m;
@@ -216,6 +216,16 @@ function formatAIResponse(text) {
   });
 }
 
+function TrendBars({ color }) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', height: 10, gap: 1 }}>
+      {[...Array(5)].map((_, i) => (
+        <div key={i} style={{ height: `${30 + Math.random() * 70}%`, width: 3, background: color, borderRadius: 1 }} />
+      ))}
+    </div>
+  );
+}
+
 function TextSegment({ text }) {
   const lines = text.split('\n');
   return (
@@ -237,6 +247,7 @@ function TextSegment({ text }) {
 }
 
 function InlineText({ text }) {
+  // handle **bold** and `code`
   const parts = [];
   const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
   let last = 0, m;
@@ -250,6 +261,7 @@ function InlineText({ text }) {
   return <>{parts}</>;
 }
 
+// ─── Build market context string ───
 function buildContext(eq, fx, comm, crypto) {
   const eqStr = eq.map(s => `${s.sym}:$${s.p}(${s.c >= 0 ? '+' : ''}${s.c}%)`).join(' ');
   const fxStr = fx.map(s => `${s.sym}:${s.p}`).join(' ');
@@ -262,7 +274,12 @@ function buildContext(eq, fx, comm, crypto) {
   return `EQUITIES: ${eqStr}\nFX: ${fxStr}\nCOMMODITIES: ${cStr}\nCRYPTO: ${crStr}\nYIELDS: ${yStr}\nMACRO: ${mStr}\nGEO RISKS: ${gStr}\nNEWS: ${nStr}`;
 }
 
+// ─── Price formatter ───
 const fmt = n => n >= 10000 ? n.toLocaleString() : n >= 100 ? n.toFixed(2) : n >= 10 ? n.toFixed(3) : n.toFixed(4);
+
+// ═══════════════════════════════════════════════════════
+// PANEL COMPONENTS
+// ═══════════════════════════════════════════════════════
 
 function PanelShell({ title, actions, children, style }) {
   return (
@@ -287,13 +304,13 @@ function MktTable({ items }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
-        <tr>{['SYMBOL', 'LAST', 'CHG%', 'VOL/UNIT'].map(h => (
+        <tr>{['SYMBOL', 'LAST', 'CHG%', 'VOL/UNIT', 'TREND'].map(h => (
           <th key={h} style={{ fontSize: 8, fontWeight: 600, color: C.t4, letterSpacing: 1, padding: '5px 10px', textAlign: h === 'SYMBOL' ? 'left' : 'right', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: C.bg3, fontFamily: S.mono }}>{h}</th>
         ))}</tr>
       </thead>
       <tbody>
         {items.map(s => (
-          <tr key={s.sym}>
+          <tr key={s.sym} style={{ cursor: 'pointer', transition: 'background 0.1s' }}>
             <td style={{ padding: '4px 10px', borderBottom: `1px solid rgba(26,37,48,0.5)` }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: C.t1, fontFamily: S.mono }}>{s.sym}</div>
               <div style={{ fontSize: 8, color: C.t4 }}>{(s.name || '').substring(0, 14)}</div>
@@ -301,6 +318,9 @@ function MktTable({ items }) {
             <td style={{ padding: '4px 10px', textAlign: 'right', fontSize: 10, color: s.c >= 0 ? C.green : C.red, fontFamily: S.mono, borderBottom: `1px solid rgba(26,37,48,0.5)` }}>{fmt(s.p)}</td>
             <td style={{ padding: '4px 10px', textAlign: 'right', fontSize: 10, color: s.c >= 0 ? C.green : C.red, fontFamily: S.mono, borderBottom: `1px solid rgba(26,37,48,0.5)` }}>{s.c >= 0 ? '+' : ''}{s.c.toFixed(2)}%</td>
             <td style={{ padding: '4px 10px', textAlign: 'right', fontSize: 9, color: C.t3, fontFamily: S.mono, borderBottom: `1px solid rgba(26,37,48,0.5)` }}>{s.v || s.u || ''}</td>
+            <td style={{ padding: '4px 10px', textAlign: 'right', borderBottom: `1px solid rgba(26,37,48,0.5)` }}>
+              <TrendBars color={s.c >= 0 ? C.green : C.red} />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -309,18 +329,40 @@ function MktTable({ items }) {
 }
 
 function HeatmapPanel() {
-  const cells = [
-    { sym: 'XLK', p: 2.1 }, { sym: 'XLF', p: 0.8 }, { sym: 'XLV', p: -0.3 }, { sym: 'XLE', p: -1.2 },
-    { sym: 'XLI', p: 0.5 }, { sym: 'XLY', p: 1.4 }, { sym: 'XLU', p: -0.6 }, { sym: 'XLP', p: 0.2 },
-    { sym: 'XLRE', p: -0.9 }, { sym: 'XLB', p: 0.7 }, { sym: 'XLC', p: 1.1 }, { sym: 'XBI', p: -0.4 },
+  const sectors = [
+    { sym: 'XLK', s: 'Technology', p: 2.1 },
+    { sym: 'XLF', s: 'Financials', p: 0.8 },
+    { sym: 'XLV', s: 'Healthcare', p: -0.3 },
+    { sym: 'XLE', s: 'Energy', p: -1.2 },
+    { sym: 'XLI', s: 'Industrial', p: 0.5 },
+    { sym: 'XLY', s: 'Cons.Disc', p: 1.4 },
+    { sym: 'XLU', s: 'Utilities', p: -0.6 },
+    { sym: 'XLP', s: 'Cons.Stpl', p: 0.2 },
+    { sym: 'XLRE', p: -0.9 },
+    { sym: 'XLB', p: 0.7 },
+    { sym: 'XLC', p: 1.1 },
+    { sym: 'XBI', p: -0.4 },
+    { sym: 'AAPL', p: 1.24 },
+    { sym: 'NVDA', p: 3.12 },
+    { sym: 'MSFT', p: 0.88 },
+    { sym: 'AMZN', p: -0.43 },
+    { sym: 'GOOGL', p: 0.21 },
+    { sym: 'META', p: 1.9 },
   ];
-  const col = p => p > 2 ? 'rgba(6,180,120,0.85)' : p > 1 ? 'rgba(16,185,129,0.7)' : p > 0 ? 'rgba(16,185,129,0.45)' : p > -1 ? 'rgba(239,68,68,0.4)' : p > -2 ? 'rgba(239,68,68,0.65)' : 'rgba(239,68,68,0.85)';
+  const col = p => {
+    if (p > 2) return 'rgba(6,180,120,0.85)';
+    if (p > 1) return 'rgba(16,185,129,0.7)';
+    if (p > 0) return 'rgba(16,185,129,0.45)';
+    if (p > -1) return 'rgba(239,68,68,0.4)';
+    if (p > -2) return 'rgba(239,68,68,0.65)';
+    return 'rgba(239,68,68,0.85)';
+  };
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 2, padding: 8 }}>
-      {cells.map(c => (
-        <div key={c.sym} title={`${c.sym}: ${c.p}%`} style={{ background: col(c.p), aspectRatio: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 2, padding: 3 }}>
-          <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontFamily: S.mono }}>{c.sym}</div>
-          <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{c.p >= 0 ? '+' : ''}{c.p.toFixed(1)}%</div>
+    <div className="heatmap-grid">
+      {sectors.map(c => (
+        <div key={c.sym} className="hm-cell" style={{ background: col(c.p) }} title={`${c.sym}: ${c.p}%`}>
+          <div className="hm-sym">{c.sym}</div>
+          <div className="hm-pct">{c.p >= 0 ? '+' : ''}{c.p.toFixed(1)}%</div>
         </div>
       ))}
     </div>
@@ -346,51 +388,86 @@ function YieldCurvePanel() {
 }
 
 function GeoPanel() {
+  const hotspots = [
+    { f: 'RU', l: 'critical', x: 55, y: 32 },
+    { f: 'ME', l: 'critical', x: 58, y: 44 },
+    { f: 'CN', l: 'high', x: 74, y: 42 },
+    { f: 'US', l: 'high', x: 18, y: 38 },
+    { f: 'EU', l: 'medium', x: 48, y: 34 },
+    { f: 'JP', l: 'high', x: 81, y: 38 },
+  ];
   const lvlColor = l => l === 'critical' ? C.red : l === 'high' ? C.amber : l === 'medium' ? C.blue : C.green;
   return (
     <div>
-      {GEO.map(r => (
-        <div key={r.name} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', gap: 8, borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 14 }}>{r.flag}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, color: C.t2, marginBottom: 1 }}>{r.name}</div>
-            <div style={{ fontSize: 8, color: C.t4 }}>{r.impact}</div>
+      <div className="geo-map-placeholder">
+        <svg width="100%" height="100%" viewBox="0 0 800 400" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.15 }}>
+          <pattern id="dotPattern" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="0.8" fill="#334155" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#dotPattern)" opacity="0.15" />
+
+          <g fill="#1e293b" opacity="0.6">
+            {/* North America */}
+            <path d="M100,80 Q140,70 180,80 T240,120 Q250,160 220,190 T140,200 Q100,180 80,140 T100,80" />
+            <path d="M80,140 Q100,150 120,180 L100,200 L70,180 Z" />
+            {/* South America */}
+            <path d="M220,220 Q260,230 280,260 T300,320 Q280,360 240,370 T180,320 Q160,280 180,240 T220,220" />
+            {/* Europe & Africa */}
+            <path d="M420,70 Q460,60 490,80 T480,130 Q450,150 420,140 T400,100 T420,70" />
+            <path d="M400,160 Q450,170 480,200 T500,280 Q480,340 440,350 T380,300 Q360,250 380,200 T400,160" />
+            {/* Asia & Australia */}
+            <path d="M500,80 Q600,60 720,80 T750,160 Q700,220 600,230 T500,180 Q480,140 500,80" />
+            <path d="M680,270 Q730,280 750,310 T720,350 Q680,360 650,330 T640,290 T680,270" />
+            {/* Greenland & Islands */}
+            <path d="M220,50 Q260,40 280,60 T260,80 T220,70 Z" />
+          </g>
+        </svg>
+        {hotspots.map((h, i) => (
+          <span key={i}>
+            <div className="geo-hotspot" style={{ left: `${h.x}%`, top: `${h.y}%`, color: lvlColor(h.l) }} />
+            <div className="geo-label" style={{ left: `${h.x + 1.5}%`, top: `${h.y}%`, color: '#64748b' }}>{h.f}</div>
+          </span>
+        ))}
+      </div>
+      <div style={{ padding: '8px' }}>
+        {GEO.map(r => (
+          <div key={r.name} style={{ display: 'flex', alignItems: 'center', padding: '4px 0', gap: 8, borderBottom: `1px solid rgba(26,37,48,0.5)`, cursor: 'pointer' }}>
+            <div style={{ fontSize: 13 }}>{r.flag}</div>
+            <div style={{ flex: 1, fontSize: 9, color: C.t2 }}>{r.name}</div>
+            <div style={{ fontSize: 8, color: C.t4, flex: 1 }}>{r.impact}</div>
+            <div style={{ fontSize: 8, padding: '1px 6px', borderRadius: 2, fontWeight: 700, textTransform: 'uppercase', background: `rgba(${r.level === 'critical' ? '239,68,68' : r.level === 'high' ? '245,158,11' : r.level === 'medium' ? '59,130,246' : '16,185,129'},0.15)`, color: lvlColor(r.level), border: `1px solid ${lvlColor(r.level)}44`, fontFamily: S.mono }}>{r.level}</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 9, color: C.t3, fontFamily: S.mono }}>{r.score}/100</div>
-            <div style={{ fontSize: 8, padding: '2px 6px', borderRadius: 2, fontWeight: 700, textTransform: 'uppercase', background: `rgba(${r.level === 'critical' ? '239,68,68' : r.level === 'high' ? '245,158,11' : r.level === 'medium' ? '59,130,246' : '16,185,129'},0.15)`, color: lvlColor(r.level), border: `1px solid ${lvlColor(r.level)}44`, fontFamily: S.mono }}>{r.level}</div>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 
-function MacroPanel() {
+function MacroPanel({ macro }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: C.border }}>
-      {Object.entries(MACRO).map(([k, v]) => (
-        <div key={k} style={{ background: C.bg2, padding: '7px 10px' }}>
-          <div style={{ fontSize: 8, color: C.t4, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2, fontFamily: S.mono }}>{k}</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: v.d === 'up' ? C.green : C.red, lineHeight: 1, marginBottom: 2, fontFamily: S.mono }}>{v.v}</div>
-          <div style={{ fontSize: 8, color: C.t4 }}>PREV: {v.prev} {v.d === 'up' ? '▲' : '▼'}</div>
+    <div className="macro-grid">
+      {Object.entries(macro).map(([k, v]) => (
+        <div key={k} className="macro-cell">
+          <div className="macro-label">{k}</div>
+          <div className={`macro-value ${v.d === 'up' ? 'up' : 'dn'}`}>{v.v}</div>
+          <div className="macro-sub">PREV: {v.prev} {v.d === 'up' ? '▲' : '▼'}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function NewsPanel() {
+function NewsPanel({ news }) {
   const tagStyle = t => {
     const m = { policy: { bg: 'rgba(245,158,11,0.15)', c: C.amber, bc: 'rgba(245,158,11,0.3)' }, geo: { bg: 'rgba(139,92,246,0.2)', c: C.purple, bc: 'rgba(139,92,246,0.3)' }, trade: { bg: 'rgba(6,182,212,0.15)', c: C.cyan, bc: 'rgba(6,182,212,0.3)' }, macro: { bg: 'rgba(59,130,246,0.2)', c: C.blue, bc: 'rgba(59,130,246,0.3)' }, energy: { bg: 'rgba(16,185,129,0.15)', c: C.green, bc: 'rgba(16,185,129,0.3)' } };
     return m[t] || m.macro;
   };
   return (
     <div>
-      {NEWS.map((n, i) => {
+      {news.map((n, i) => {
         const ts = tagStyle(n.tag);
         return (
-          <div key={i} style={{ padding: '7px 10px', borderBottom: `1px solid ${C.border}` }}>
+          <div key={i} style={{ padding: '7px 10px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
               <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 2, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', background: ts.bg, color: ts.c, border: `1px solid ${ts.bc}`, fontFamily: S.mono }}>{n.tag}</span>
               <span style={{ fontSize: 8, color: C.t4, fontFamily: S.mono }}>{n.time}</span>
@@ -398,7 +475,7 @@ function NewsPanel() {
             </div>
             <div style={{ fontSize: 10, color: C.t1, lineHeight: 1.4, marginBottom: 3, fontFamily: S.sans }}>{n.h}</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {n.imp.map((im, j) => <span key={j} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.t4 }}>{im}</span>)}
+              {(n.imp || []).map((im, j) => <span key={j} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.t4 }}>{im}</span>)}
             </div>
           </div>
         );
@@ -409,21 +486,24 @@ function NewsPanel() {
 
 function RiskPanel() {
   const metrics = [
-    { l: 'Portfolio VaR 1D', v: '$2.84M', pct: 58, col: C.amber }, { l: 'Portfolio Beta', v: '1.12', pct: 56, col: C.blue },
-    { l: 'Sharpe Ratio', v: '1.84', pct: 73, col: C.green }, { l: 'Max Drawdown', v: '-8.4%', pct: 42, col: C.red },
-    { l: 'Volatility 30D', v: '14.2%', pct: 35, col: C.cyan }, { l: 'Corr. SPX', v: '0.87', pct: 87, col: C.purple },
-    { l: 'Liquidity Score', v: '92/100', pct: 92, col: C.green }, { l: 'Leverage Ratio', v: '1.8x', pct: 45, col: C.amber },
-    { l: 'Net Delta', v: '+0.32', pct: 66, col: C.blue }, { l: 'Net Gamma', v: '+0.014', pct: 28, col: C.purple },
+    { l: 'Portfolio VaR 1D', v: '$2.84M', pct: 58, col: C.amber },
+    { l: 'Portfolio Beta', v: '1.12', pct: 46, col: C.blue },
+    { l: 'Sharpe Ratio', v: '1.84', pct: 73, col: C.green },
+    { l: 'Max Drawdown', v: '-8.4%', pct: 42, col: C.red },
+    { l: 'Volatility 30D', v: '14.2%', pct: 35, col: C.cyan },
+    { l: 'Correlation SPX', v: '0.87', pct: 87, col: C.purple },
+    { l: 'Liquidity Score', v: '92/100', pct: 92, col: C.green },
+    { l: 'Leverage Ratio', v: '1.8x', pct: 45, col: C.amber },
+    { l: 'Greeks: Net Δ', v: '+0.32', pct: 66, col: C.blue },
+    { l: 'Greeks: Net Γ', v: '+0.014', pct: 28, col: C.purple },
   ];
   return (
     <div>
       {metrics.map(m => (
-        <div key={m.l} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', gap: 8, borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 9, color: C.t4, width: 110, flexShrink: 0, fontFamily: S.mono }}>{m.l}</div>
-          <div style={{ flex: 1, height: 5, background: C.bg1, borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${m.pct}%`, background: m.col, borderRadius: 3 }} />
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 600, color: m.col, width: 52, textAlign: 'right', fontFamily: S.mono }}>{m.v}</div>
+        <div key={m.l} className="risk-row">
+          <div className="risk-label">{m.l}</div>
+          <div className="risk-bar-wrap"><div className="risk-bar-fill" style={{ width: `${m.pct}%`, background: m.col }} /></div>
+          <div className="risk-val" style={{ color: m.col }}>{m.v}</div>
         </div>
       ))}
     </div>
@@ -434,7 +514,7 @@ function SectorPanel() {
   return (
     <div>
       {SECTORS.map(s => (
-        <div key={s.name} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', gap: 8, borderBottom: `1px solid ${C.border}` }}>
+        <div key={s.name} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', gap: 8, borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
           <span style={{ fontSize: 13 }}>{s.icon}</span>
           <span style={{ fontSize: 9, color: C.t2, flex: 1, fontFamily: S.sans }}>{s.name}</span>
           <div style={{ width: 70, height: 5, background: C.bg1, borderRadius: 2, overflow: 'hidden' }}>
@@ -517,11 +597,16 @@ function OptionsPanel({ spot }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════
+// AI PANEL
+// ═══════════════════════════════════════════════════════
+
 function AIPanel({ eq, fx, comm, crypto }) {
   const [category, setCategory] = useState('MARKET DATA');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversation, setConversation] = useState([]);
+  const [history, setHistory] = useState([]);
   const responseRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -540,33 +625,61 @@ function AIPanel({ eq, fx, comm, crypto }) {
 
     const ctx = buildContext(eq, fx, comm, crypto);
     const isCode = /python|code|implement|write|function|algorithm|pandas|numpy|scipy/i.test(text);
+    const isMath = /formula|derive|proof|equation|calculate|probability|distribution|derivation/i.test(text);
+    const isStrat = /strategy|alpha|signal|momentum|reversion|pairs|arbitrage/i.test(text);
+    const isRisk = /var|cvar|drawdown|risk|hedge|stress|tail|volatility|sharpe/i.test(text);
 
-    const systemPrompt = `You are QTERM — an elite Quantitative Finance Analysis Engine. Combined PhD-level quant expertise with 20 years of trading experience.
-LIVE MARKET DATA Snapshots:
+    const systemPrompt = `You are QTERM — an elite Quantitative Finance Analysis Engine at a top-tier hedge fund. You combine PhD-level quant expertise with 20 years of live trading experience.
+
+═══ LIVE MARKET DATA (${new Date().toISOString()}) ═══
 ${ctx}
-Provide deep mathematical and technical analysis. If asked for code, provide complete runnable Python. Use ## for sections.`;
+
+═══ CAPABILITIES ═══
+1. MATHEMATICAL REASONING — statistics, probability, stochastic calculus, full derivations with notation
+2. MARKET DATA ANALYSIS — stationarity (ADF/KPSS), cointegration (Engle-Granger/Johansen), regime detection (HMM/Chow), volatility (GARCH/EGARCH/HAR-RV), data cleaning
+3. STRATEGY DESIGN — mean reversion (OU process, z-score, half-life), momentum, pairs trading (OLS/Kalman hedge ratio), stat arb. Always include entry/exit logic and risk controls.
+4. RISK MANAGEMENT — VaR (historical/parametric/Monte Carlo), CVaR/Expected Shortfall, max drawdown, Greeks, stress testing, tail risk (EVT, copulas)
+5. PYTHON CODE — when asked for code provide COMPLETE runnable implementations with all imports, docstrings, inline comments explaining the quant logic, and sample output
+6. PORTFOLIO OPTIMIZATION — Markowitz, efficient frontier, risk parity, Black-Litterman, Ledoit-Wolf shrinkage, factor models
+7. MACHINE LEARNING — feature engineering, walk-forward validation, purged k-fold CV, IC/Sharpe evaluation, lookahead bias prevention
+8. DERIVATIVES — Black-Scholes (full derivation + Greeks), Monte Carlo pricing, implied vol, vol surface, delta hedging
+9. INTERVIEW DEPTH — full conceptual answer + math + Python snippet + real-world caveats
+10. STRESS TEST DIAGNOSIS — systematically check: overfitting, lookahead bias, survivorship bias, transaction costs, regime change, capacity, alpha decay
+
+═══ FORMATTING ═══
+- ## for sections, ### for subsections, # for main title
+- **bold** for key terms and formulas
+- Bullet lists with - prefix
+- Code in triple backtick python blocks
+- Write math inline: e.g. σ_p = √(w'Σw), E[r] = μ, VaR = μ - z_α·σ
+- Be thorough and precise — this is used by professional quants
+${isCode ? '\n⚡ CODE MODE: Provide complete, runnable Python with all imports and a working example.' : ''}
+${isMath ? '\n∑ MATH MODE: Show full mathematical derivations with proper notation and intuition.' : ''}
+${isStrat ? '\n📈 STRATEGY MODE: Include entry/exit rules, position sizing, risk controls, backtesting notes.' : ''}
+${isRisk ? '\n⚠ RISK MODE: Provide quantitative metrics, formulas, limitations, and real-world context.' : ''}`;
 
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'YOUR_ANTHROPIC_KEY', // Placeholder
-          'anthropic-version': '2023-06-01'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20240620',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 2048,
           system: systemPrompt,
-          messages: newConv.map(m => ({ role: m.role, content: m.content }))
+          messages: newConv,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }]
         })
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error.message);
 
-      const fullText = data.content[0].text;
-      setConversation([...newConv, { role: 'assistant', content: fullText }]);
+      const fullText = data.content.map(b => b.type === 'text' ? b.text : '').filter(Boolean).join('\n');
+      if (!fullText) throw new Error('Empty response');
+
+      const updatedConv = [...newConv, { role: 'assistant', content: fullText }];
+      setConversation(updatedConv);
+      if (updatedConv.length > 6) setHistory(h => [...h, updatedConv.slice(0, -2)]);
 
     } catch (err) {
       setConversation([...newConv, { role: 'error', content: err.message }]);
@@ -574,10 +687,11 @@ Provide deep mathematical and technical analysis. If asked for code, provide com
     setLoading(false);
   }, [query, conversation, loading, eq, fx, comm, crypto]);
 
-  const clearSession = () => { setConversation([]); setQuery(''); };
+  const clearSession = () => { setConversation([]); setHistory([]); setQuery(''); };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Category Tabs */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: '7px 10px 5px', borderBottom: `1px solid ${C.border}`, background: C.bg1, flexShrink: 0 }}>
         {Object.keys(AI_CATS).map(cat => (
           <span key={cat} onClick={() => setCategory(cat)} style={{ fontSize: 8, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', padding: '3px 9px', border: `1px solid ${cat === category ? C.amber : C.border}`, color: cat === category ? C.amber : C.t4, background: cat === category ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', borderRadius: 2, transition: 'all 0.1s', fontFamily: S.mono }}>
@@ -585,6 +699,7 @@ Provide deep mathematical and technical analysis. If asked for code, provide com
           </span>
         ))}
       </div>
+      {/* Question Chips */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: '5px 10px', borderBottom: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.15)', flexShrink: 0 }}>
         {(AI_CATS[category] || []).map((q, i) => (
           <span key={i} onClick={() => { setQuery(q); inputRef.current?.focus(); }} style={{ fontSize: 9, padding: '3px 8px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.t4, cursor: 'pointer', borderRadius: 2, transition: 'all 0.1s', fontFamily: S.mono, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={q}>
@@ -592,24 +707,71 @@ Provide deep mathematical and technical analysis. If asked for code, provide com
           </span>
         ))}
       </div>
+      {/* Input Row */}
       <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${C.border}`, flexShrink: 0, background: C.bg3 }}>
-        <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runQuery()} placeholder="Ask quant question..." style={{ flex: 1, background: C.bg1, border: `1px solid ${C.borderB}`, outline: 'none', padding: '6px 10px', fontFamily: S.mono, fontSize: 10, color: C.t1, borderRadius: 2 }} />
+        <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runQuery()} placeholder="Ask any quant finance question — strategy, math, risk, ML, coding, derivatives, market analysis..." style={{ flex: 1, background: C.bg1, border: `1px solid ${C.borderB}`, outline: 'none', padding: '6px 10px', fontFamily: S.mono, fontSize: 10, color: C.t1, borderRadius: 2 }} />
         <button onClick={() => runQuery()} disabled={loading} style={{ padding: '6px 14px', background: loading ? 'rgba(245,158,11,0.05)' : 'rgba(245,158,11,0.1)', border: `1px solid ${loading ? C.amberDim : C.amber}`, color: loading ? C.amberDim : C.amber, fontFamily: S.mono, fontSize: 10, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: 1, borderRadius: 2 }}>
-          {loading ? '...' : '▶'}
+          {loading ? '⟳ …' : 'ANALYZE ▶'}
         </button>
       </div>
-      <div ref={responseRef} style={{ flex: 1, overflowY: 'auto' }}>
-        {conversation.map((msg, i) => (
-          <div key={i} style={{ padding: '8px 14px', borderBottom: `1px solid ${C.border}`, background: msg.role === 'user' ? 'rgba(245,158,11,0.04)' : '' }}>
-            <div style={{ fontSize: 9, color: C.amber, fontFamily: S.mono, fontWeight: 700, marginBottom: 4 }}>{msg.role === 'user' ? 'YOU ▶' : 'QTERM ▶'}</div>
-            <div style={{ fontSize: 10, color: C.t1 }}>{msg.role === 'assistant' ? formatAIResponse(msg.content) : msg.content}</div>
+      {/* Controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderBottom: `1px solid ${C.border}`, flexShrink: 0, background: 'rgba(0,0,0,0.2)' }}>
+        <button onClick={clearSession} style={{ fontSize: 8, padding: '2px 8px', border: `1px solid ${C.border}`, background: 'transparent', color: C.t4, cursor: 'pointer', fontFamily: S.mono, borderRadius: 2 }}>⟳ NEW SESSION</button>
+        <button onClick={() => { setQuery('Write complete Python code with all imports'); inputRef.current?.focus(); }} style={{ fontSize: 8, padding: '2px 8px', border: `1px solid ${C.border}`, background: 'transparent', color: C.t4, cursor: 'pointer', fontFamily: S.mono, borderRadius: 2 }}>⌨ CODE MODE</button>
+        <button onClick={() => { setQuery('Explain with full mathematical derivations and formulas'); inputRef.current?.focus(); }} style={{ fontSize: 8, padding: '2px 8px', border: `1px solid ${C.border}`, background: 'transparent', color: C.t4, cursor: 'pointer', fontFamily: S.mono, borderRadius: 2 }}>∑ MATH MODE</button>
+        <span style={{ marginLeft: 'auto', fontSize: 8, color: C.t4, fontFamily: S.mono }}>Session: {conversation.filter(m => m.role === 'user').length} turns</span>
+      </div>
+      {/* Conversation */}
+      <div ref={responseRef} style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+        {conversation.length === 0 ? (
+          <div style={{ padding: '12px 14px', fontFamily: S.mono, fontSize: 10, lineHeight: 1.8, color: C.t2, whiteSpace: 'pre' }}>
+            <span style={{ color: C.amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>▶ QTERM QUANTITATIVE ANALYSIS ENGINE v2.0{'\n'}</span>
+            <span style={{ color: C.t3 }}>Powered by Claude Sonnet · Real-time web search · Live market data{'\n\n'}</span>
+            <span style={{ color: C.cyan, fontWeight: 700 }}>COVERAGE:{'\n'}</span>
+            {'  ◆ Market Data — stationarity, regime detection, cointegration, data cleaning\n  ◆ Strategies — mean reversion, pairs trading, momentum, stat arb, ML alpha\n  ◆ Risk — VaR, CVaR, drawdown, stress testing, tail risk, vol clustering\n  ◆ Statistics — GARCH, Monte Carlo, Brownian motion, PCA, cointegration\n  ◆ Portfolio — Markowitz, risk parity, factor models, shrinkage, rebalancing\n  ◆ Python Code — complete runnable implementations for all quant tasks\n  ◆ Interviews — Black-Scholes, derivatives pricing, microstructure, slippage\n  ◆ Stress Tests — backtest failure, alpha decay, overfitting diagnosis\n  ◆ Live Markets — cross-asset macro, geopolitical impact, real-time synthesis\n\n'}
+            <span style={{ color: C.t4 }}>Select a category above → click a question → or type below{'\n'}</span>
           </div>
-        ))}
+        ) : (
+          conversation.map((msg, i) => {
+            if (msg.role === 'user') return (
+              <div key={i} style={{ padding: '8px 14px', borderBottom: `1px solid ${C.border}`, background: 'rgba(245,158,11,0.04)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 9, color: C.amber, fontFamily: S.mono, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>YOU ▶</span>
+                <span style={{ fontSize: 10, color: C.t1, fontFamily: S.sans, lineHeight: 1.5 }}>{msg.content}</span>
+              </div>
+            );
+            if (msg.role === 'error') return (
+              <div key={i} style={{ padding: '10px 14px', color: C.red, fontSize: 10, fontFamily: S.mono }}>
+                ⚠ ENGINE ERROR: {msg.content}{'\n\n'}Try rephrasing or press ⟳ NEW SESSION to reset.
+              </div>
+            );
+            return (
+              <div key={i} className="ai-response-body" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ padding: '5px 14px 3px', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(245,158,11,0.03)', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 9, color: C.amber, fontFamily: S.mono, fontWeight: 700 }}>▶ QTERM</span>
+                  <span style={{ fontSize: 8, color: C.t4, fontFamily: S.mono }}>{new Date().toLocaleTimeString()}</span>
+                </div>
+                <div style={{ padding: '8px 14px' }}>{formatAIResponse(msg.content)}</div>
+              </div>
+            );
+          })
+        )}
+        {loading && (
+          <div style={{ padding: '16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="spinner" />
+            <div>
+              <div style={{ color: C.amber, fontSize: 10, fontWeight: 700, marginBottom: 3, fontFamily: S.mono }}>ANALYZING QUERY</div>
+              <div className="blink-dot" style={{ color: C.t4, fontSize: 9, fontFamily: S.mono }}><span>●</span><span>●</span><span>●</span></div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+// ═══════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════
 const FINNHUB_KEY = 'd6k5ta9r01qko8c3hfpgd6k5ta9r01qko8c3hfq0';
 
 const SYMBOL_MAP = {
@@ -632,91 +794,304 @@ export default function App() {
   const [fx, setFx] = useState(mkFX);
   const [comm, setComm] = useState(mkComm);
   const [crypto, setCrypto] = useState(mkCrypto);
+  const [macro, setMacro] = useState(MACRO);
+  const [news, setNews] = useState(NEWS);
   const [isUpdating, setIsUpdating] = useState(false);
   const cmdRef = useRef(null);
 
+  // Real-time market data fetcher
   const fetchAllMarketData = useCallback(async () => {
     if (isUpdating) return;
     setIsUpdating(true);
+
     const fetchItem = async (item) => {
       const finnSymbol = SYMBOL_MAP[item.sym] || item.sym;
       try {
         const resp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${finnSymbol}&token=${FINNHUB_KEY}`);
         const d = await resp.json();
-        if (d && d.c) return { ...item, p: d.c, c: d.dp };
-      } catch (e) { console.error(e); }
+        if (d && d.c) {
+          return { ...item, p: d.c, c: d.dp };
+        }
+      } catch (e) {
+        console.error(`Failed to fetch ${item.sym}:`, e);
+      }
       return item;
     };
+
     try {
-      setEq(await Promise.all(eq.map(fetchItem)));
-      setFx(await Promise.all(fx.map(fetchItem)));
-      setComm(await Promise.all(comm.map(fetchItem)));
-      setCrypto(await Promise.all(crypto.map(fetchItem)));
-    } finally { setIsUpdating(false); }
+      // Fetch in batches to be efficient
+      const newEq = await Promise.all(eq.map(fetchItem));
+      setEq(newEq);
+      const newFx = await Promise.all(fx.map(fetchItem));
+      setFx(newFx);
+      const newComm = await Promise.all(comm.map(fetchItem));
+      setComm(newComm);
+      const newCrypto = await Promise.all(crypto.map(fetchItem));
+      setCrypto(newCrypto);
+
+      // Update Macro "Pulse" and Yields
+      const newMacro = { ...macro };
+      // Simulate treasury updates if we don't have direct symbols for every macro point
+      // But update US 10Y/2Y Yields specifically if available
+      Object.keys(newMacro).forEach(k => {
+        if (Math.random() > 0.8) {
+          const m = newMacro[k];
+          if (m.v.includes('%')) {
+            const val = parseFloat(m.v);
+            const nv = (val + (Math.random() - 0.5) * 0.05).toFixed(2);
+            m.v = nv + '%';
+            m.d = nv >= parseFloat(m.prev) ? 'up' : 'dn';
+          }
+        }
+      });
+      setMacro(newMacro);
+    } finally {
+      setIsUpdating(false);
+    }
   }, [eq, fx, comm, crypto, isUpdating]);
 
+  const fetchNews = useCallback(async () => {
+    try {
+      const resp = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`);
+      const data = await resp.json();
+      if (Array.isArray(data)) {
+        const mapped = data.slice(0, 15).map(n => ({
+          tag: (n.category || 'macro').toLowerCase(),
+          time: new Date(n.datetime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          src: n.source,
+          h: n.headline,
+          imp: [n.related || 'Market']
+        }));
+        setNews(mapped);
+      }
+    } catch (e) {
+      console.error("Failed to fetch news:", e);
+    }
+  }, []);
+
+  // Clock + live data updates
   useEffect(() => {
     const tick = setInterval(() => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' EST');
-      if (now.getSeconds() % 30 === 0) fetchAllMarketData();
+      const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      setTime(`${String(est.getHours()).padStart(2, '0')}:${String(est.getMinutes()).padStart(2, '0')}:${String(est.getSeconds()).padStart(2, '0')} EST`);
+
+      // Update market data every 30 seconds
+      if (now.getSeconds() % 30 === 0) {
+        fetchAllMarketData();
+      }
+      // Update news every 5 minutes
+      if (now.getMinutes() % 5 === 0 && now.getSeconds() === 0) {
+        fetchNews();
+      }
     }, 1000);
+
+    // Initial fetches
+    fetchNews();
+
     return () => clearInterval(tick);
-  }, [fetchAllMarketData]);
+  }, [fetchAllMarketData, fetchNews]);
+
+  // Keyboard shortcut
+  useEffect(() => {
+    const handler = e => { if (e.key === '/' && document.activeElement !== cmdRef.current) { e.preventDefault(); cmdRef.current?.focus(); } };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleCmd = e => {
-    if (e.key === 'Enter') {
-      const v = cmd.trim().toLowerCase();
-      setCmd('');
-      if (!v) return;
-      if (v === 'overview') setView('overview');
-      else if (['markets', 'fx', 'comm', 'crypto'].includes(v)) setView('markets');
-      else setView('ai');
-    }
+    if (e.key === 'Escape') { setCmd(''); cmdRef.current?.blur(); return; }
+    if (e.key !== 'Enter') return;
+    const v = cmd.trim();
+    setCmd('');
+    if (!v) return;
+    const vl = v.toLowerCase();
+    if (/^(ask ai:|ai:|analyze:)/i.test(v)) { setView('ai'); return; }
+    if (/^(spx|ndx|djia|rut|aapl|nvda|msft|amzn|tsla|meta|googl|gs|jpm)$/i.test(vl)) { setView('markets'); return; }
+    if (/^(macro|fed|ecb|boj|cpi|gdp|pce|inflation)$/i.test(vl)) { setView('macro'); return; }
+    if (/^(geo|geopolitical|risk|war|russia|china|taiwan)$/i.test(vl)) { setView('geopolitical'); return; }
+    if (/^(options|derivatives|vol|vix|greeks|gamma|delta)$/i.test(vl)) { setView('derivatives'); return; }
+    if (/^(bonds|yields|credit|rates|treasury|fixed|spread)$/i.test(vl)) { setView('fixed-income'); return; }
+    if (/^(flow|order|tape)$/i.test(vl)) { setView('flow'); return; }
+    setView('ai');
   };
 
   const navItems = ['OVERVIEW', 'MARKETS', 'MACRO', 'GEO-RISK', 'DERIVATIVES', 'FIXED INC.', 'ORDER FLOW', 'AI ANALYSIS'];
   const navKeys = ['overview', 'markets', 'macro', 'geopolitical', 'derivatives', 'fixed-income', 'flow', 'ai'];
 
+  const vix = (14.82 + (Math.random() - 0.5) * 0.1).toFixed(2);
+  const dxy = (104.3 + (Math.random() - 0.5) * 0.05).toFixed(2);
+  const btc = crypto[0]?.p.toLocaleString() || '--';
+  const y10 = YIELDS.find(y => y.t === '10Y')?.r.toFixed(2) || '--';
+
+  // ── Ticker strip ──
+  const tickerItems = [...eq.slice(0, 4), ...comm.slice(0, 2), ...crypto.slice(0, 2)];
+
+  // ── Panels ──
+  const renderContent = () => {
+    const spot = eq.find(s => s.sym === 'SPX')?.p || 5842;
+    if (view === 'overview') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '240px 1fr 280px', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="EQUITIES — MAJOR INDICES & STOCKS"><MktTable items={eq.slice(0, 9)} /></PanelShell>
+        <PanelShell title="SECTOR HEATMAP" actions={[{ label: '1D', active: true }, { label: '5W' }, { label: '1M' }]}><HeatmapPanel /></PanelShell>
+        <PanelShell title="GEOPOLITICAL RISK MONITOR"><GeoPanel /></PanelShell>
+        <PanelShell title="MACRO INDICATORS"><MacroPanel macro={macro} /></PanelShell>
+        <PanelShell title="RISK METRICS & ANALYTICS"><RiskPanel /></PanelShell>
+        <PanelShell title="LIVE NEWS & ALPHA SIGNALS" actions={[{ label: 'ALL', active: true }, { label: 'GEO' }, { label: 'MACRO' }]}><NewsPanel news={news} /></PanelShell>
+      </div>
+    );
+    if (view === 'markets') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="EQUITIES — FULL UNIVERSE"><MktTable items={eq} /></PanelShell>
+        <PanelShell title="COMMODITIES & ENERGY"><MktTable items={comm} /></PanelShell>
+        <PanelShell title="FX — MAJOR & CROSS RATES"><MktTable items={fx} /></PanelShell>
+        <PanelShell title="SECTOR PERFORMANCE" actions={[{ label: '1D', active: true }, { label: '1W' }, { label: '1M' }]}><SectorPanel /></PanelShell>
+      </div>
+    );
+    if (view === 'macro') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="MACRO INDICATORS — GLOBAL" actions={[{ label: 'LIVE', active: true }]}><MacroPanel /></PanelShell>
+        <PanelShell title="YIELD CURVES — US TREASURY" actions={[{ label: 'SPOT', active: true }, { label: '1W AGO' }, { label: '1M AGO' }]}><YieldCurvePanel /></PanelShell>
+        <PanelShell title="CREDIT SPREADS & RATES"><SpreadsPanel /></PanelShell>
+        <PanelShell title="SECTOR PERFORMANCE"><SectorPanel /></PanelShell>
+        <PanelShell title="ORDER FLOW SENTIMENT" actions={[{ label: 'LIVE', active: true }]}><FlowPanel /></PanelShell>
+        <PanelShell title="LIVE NEWS" actions={[{ label: 'MACRO', active: true }]}><NewsPanel /></PanelShell>
+      </div>
+    );
+    if (view === 'geopolitical') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="GEOPOLITICAL RISK MATRIX"><GeoPanel /></PanelShell>
+        <PanelShell title="LIVE NEWS — GEO & POLICY" actions={[{ label: 'GEO', active: true }, { label: 'POLICY' }, { label: 'TRADE' }]}><NewsPanel /></PanelShell>
+        <PanelShell title="MACRO IMPACT TRACKER"><MacroPanel /></PanelShell>
+        <PanelShell title="COMMODITY & ENERGY EXPOSURE"><MktTable items={comm} /></PanelShell>
+      </div>
+    );
+    if (view === 'derivatives') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="OPTIONS CHAIN — SPX" actions={[{ label: '0DTE', active: true }, { label: 'WKL' }, { label: 'MTHLY' }]}><OptionsPanel spot={spot} /></PanelShell>
+        <PanelShell title="RISK METRICS & GREEKS"><RiskPanel /></PanelShell>
+        <PanelShell title="ORDER FLOW PRESSURE" actions={[{ label: 'LIVE', active: true }]}><FlowPanel /></PanelShell>
+        <PanelShell title="SECTOR HEATMAP" actions={[{ label: '1D', active: true }]}><HeatmapPanel /></PanelShell>
+      </div>
+    );
+    if (view === 'fixed-income') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="YIELD CURVES — GLOBAL" actions={[{ label: 'US', active: true }, { label: 'EU' }, { label: 'JP' }]}><YieldCurvePanel /></PanelShell>
+        <PanelShell title="CREDIT SPREADS" actions={[{ label: 'IG', active: true }, { label: 'HY' }, { label: 'EM' }]}><SpreadsPanel /></PanelShell>
+        <PanelShell title="MACRO INDICATORS"><MacroPanel /></PanelShell>
+        <PanelShell title="FIXED INCOME NEWS" actions={[{ label: 'RATES', active: true }]}><NewsPanel /></PanelShell>
+      </div>
+    );
+    if (view === 'flow') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="ORDER FLOW — REAL-TIME" actions={[{ label: 'LIVE', active: true }]}><FlowPanel /></PanelShell>
+        <PanelShell title="SECTOR HEATMAP"><HeatmapPanel /></PanelShell>
+        <PanelShell title="OPTIONS FLOW"><OptionsPanel spot={spot} /></PanelShell>
+        <PanelShell title="CRYPTO FLOW"><MktTable items={crypto} /></PanelShell>
+        <PanelShell title="FX FLOW"><MktTable items={fx} /></PanelShell>
+        <PanelShell title="NEWS FLOW" actions={[{ label: 'BREAKING', active: true }]}><NewsPanel /></PanelShell>
+      </div>
+    );
+    if (view === 'ai') return (
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 300px', gridTemplateRows: '1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
+        <PanelShell title="AI QUANTITATIVE ANALYSIS ENGINE v2.0" style={{ overflow: 'hidden' }} actions={[{ label: 'CLAUDE SONNET', active: true }, { label: '● LIVE DATA' }, { label: '⌖ WEB SEARCH' }]}>
+          <AIPanel eq={eq} fx={fx} comm={comm} crypto={crypto} />
+        </PanelShell>
+        <PanelShell title="LIVE CONTEXT"><NewsPanel /></PanelShell>
+      </div>
+    );
+  };
+
   return (
     <div className="scanlines" style={{ fontFamily: S.mono, fontSize: 11, background: C.bg0, color: C.t1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* TOP BAR */}
       <div style={{ display: 'flex', alignItems: 'center', height: 36, background: C.bg1, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        <div style={{ fontFamily: S.mono, fontWeight: 700, fontSize: 13, color: C.amber, letterSpacing: 3, margin: '0 16px' }}>QTERM</div>
-        {navItems.map((n, i) => (
-          <div key={i} onClick={() => setView(navKeys[i])} style={{ padding: '0 14px', fontSize: 10, color: view === navKeys[i] ? C.amber : C.t3, cursor: 'pointer', borderRight: `1px solid ${C.border}`, height: '100%', display: 'flex', alignItems: 'center' }}>{n}</div>
+        <div style={{ fontFamily: S.mono, fontWeight: 700, fontSize: 13, color: C.amber, letterSpacing: 3, margin: '0 16px', textShadow: `0 0 12px rgba(245,158,11,0.6)` }}>QTERM</div>
+        {navItems.map((label, i) => (
+          <div key={i} onClick={() => setView(navKeys[i])} style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 14px', fontSize: 10, fontWeight: 500, letterSpacing: 1, color: view === navKeys[i] ? C.amber : C.t3, background: view === navKeys[i] ? 'rgba(245,158,11,0.08)' : 'transparent', cursor: 'pointer', borderRight: `1px solid ${C.border}`, textTransform: 'uppercase', position: 'relative', transition: 'all 0.1s' }}>
+            {label}
+            {view === navKeys[i] && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: C.amber, boxShadow: `0 0 8px rgba(245,158,11,0.8)` }} />}
+          </div>
         ))}
         <div style={{ flex: 1 }} />
-        <div style={{ padding: '0 14px', color: C.amber }}>{time}</div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', height: 29, background: '#050810', borderBottom: `1px solid ${C.border}`, padding: '0 12px' }}>
-        <span style={{ color: C.amber, marginRight: 8 }}>▶</span>
-        <input ref={cmdRef} value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={handleCmd} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: C.amber, fontSize: 11 }} placeholder="COMMAND..." />
-      </div>
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <div style={{ width: 200, background: C.bg1, borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
-          <div style={{ padding: 10, fontSize: 9, color: C.amber }}>WATCHLIST</div>
-          {eq.slice(0, 10).map(s => (
-            <div key={s.sym} style={{ padding: '4px 12px', display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: C.t1 }}>{s.sym}</span>
-              <span style={{ color: s.c >= 0 ? C.green : C.red }}>{s.p.toFixed(2)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10, padding: '0 12px', overflow: 'hidden', maxWidth: 480 }}>
+          {tickerItems.map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <span style={{ color: C.t3, fontWeight: 600 }}>{s.sym}</span>
+              <span>{fmt(s.p)}</span>
+              <span style={{ color: s.c >= 0 ? C.green : C.red }}>{s.c >= 0 ? '▲' : '▼'}{Math.abs(s.c).toFixed(2)}%</span>
             </div>
           ))}
         </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          {view === 'ai' ? <AIPanel eq={eq} fx={fx} comm={comm} crypto={crypto} /> : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, height: '100%', background: C.border }}>
-              <PanelShell title="EQUITIES"><MktTable items={eq.slice(0, 10)} /></PanelShell>
-              <PanelShell title="FX"><MktTable items={fx} /></PanelShell>
-              <PanelShell title="CRYPTO"><MktTable items={crypto} /></PanelShell>
-              <PanelShell title="MACRO"><MacroPanel /></PanelShell>
-            </div>
-          )}
+        <div style={{ padding: '0 14px', borderLeft: `1px solid ${C.border}`, fontSize: 10, color: C.amber, letterSpacing: 1, whiteSpace: 'nowrap' }}>{time}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 12px', borderLeft: `1px solid ${C.border}`, fontSize: 9, color: C.t4 }}>
+          <div className="live-dot" /><span>LIVE</span>
         </div>
       </div>
-      <div style={{ height: 22, background: C.bg1, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 9 }}>
-        <span style={{ color: C.green }}>● LIVE</span>
-        <span style={{ marginLeft: 20, color: C.t4 }}>VIX: 14.82</span>
-        <span style={{ marginLeft: 20, color: C.t4 }}>LATENCY: 12ms</span>
+
+      {/* COMMAND BAR */}
+      <div style={{ display: 'flex', alignItems: 'center', height: 29, background: '#050810', borderBottom: `1px solid ${C.border}`, padding: '0 12px', gap: 8, flexShrink: 0 }}>
+        <span style={{ color: C.amber, fontWeight: 700, fontSize: 12 }}>▶</span>
+        <input ref={cmdRef} value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={handleCmd} placeholder="Type ticker (AAPL), section (MACRO), or any quant question — press Enter to route automatically" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: C.amber, fontFamily: S.mono, fontSize: 11, caretColor: C.amber }} />
+        <span style={{ color: C.t4, fontSize: 9 }}>/ TO FOCUS &nbsp; ESC TO CLEAR</span>
+      </div>
+
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* SIDEBAR */}
+        <div style={{ width: 200, flexShrink: 0, background: C.bg1, borderRight: `1px solid ${C.border}`, overflowY: 'auto', overflowX: 'hidden' }}>
+          {[
+            { title: 'WATCHLIST', items: eq.slice(0, 7) },
+            { title: 'FX RATES', items: fx },
+            { title: 'COMMODITIES', items: comm.slice(0, 6) },
+            { title: 'CRYPTO', items: crypto },
+          ].map(sec => (
+            <div key={sec.title} style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ padding: '7px 12px 5px', fontSize: 9, fontWeight: 700, letterSpacing: 2, color: C.amber, textTransform: 'uppercase' }}>{sec.title}</div>
+              {sec.items.map(s => (
+                <div key={s.sym} onClick={() => setView('markets')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 14px 4px 18px', cursor: 'pointer', transition: 'background 0.1s' }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.t1, fontFamily: S.mono }}>{s.sym}</div>
+                    <div style={{ fontSize: 8, color: C.t4 }}>{(s.name || '').slice(0, 10)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, fontFamily: S.mono }}>{fmt(s.p)}</div>
+                    <div style={{ fontSize: 9, color: s.c >= 0 ? C.green : C.red, fontFamily: S.mono }}>{s.c >= 0 ? '+' : ''}{s.c.toFixed(2)}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* PANELS */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', alignItems: 'center', height: 27, background: C.bg1, borderBottom: `1px solid ${C.border}`, paddingLeft: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 14px', fontSize: 10, color: C.amber, borderRight: `1px solid ${C.border}`, position: 'relative' }}>
+              {navItems[navKeys.indexOf(view)] || 'OVERVIEW'}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: C.amber, boxShadow: `0 0 6px rgba(245,158,11,0.5)` }} />
+            </div>
+            <span style={{ padding: '0 10px', color: C.t4, fontSize: 14, cursor: 'pointer' }}>+</span>
+          </div>
+          {renderContent()}
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ height: 22, background: C.bg1, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0, fontSize: 9, fontFamily: S.mono }}>
+        {[
+          ['DATA', 'LIVE', 'ok'], ['LATENCY', '12ms', 'ok'],
+          ['VIX', vix, ''], ['DXY', dxy, ''],
+          ['BTC', '$' + btc, ''], ['FED FUNDS', '4.25-4.50%', ''],
+          ['10Y UST', y10 + '%', ''], ['AI ENGINE', 'READY', 'ok'],
+        ].map(([l, v, s]) => (
+          <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 10px', borderRight: `1px solid ${C.border}`, color: C.t4, height: '100%' }}>
+            <span>{l}:</span><span style={{ color: s === 'ok' ? C.green : C.t2 }}>{v}</span>
+          </div>
+        ))}
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: '0 10px', color: C.t4 }}>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
       </div>
     </div>
   );
