@@ -443,7 +443,7 @@ function GeoPanel() {
   );
 }
 
-function MacroPanel({ macro }) {
+function MacroPanel({ macro = MACRO }) {
   return (
     <div className="macro-grid">
       {Object.entries(macro).map(([k, v]) => (
@@ -457,7 +457,7 @@ function MacroPanel({ macro }) {
   );
 }
 
-function NewsPanel({ news }) {
+function NewsPanel({ news = NEWS }) {
   const tagStyle = t => {
     const m = { policy: { bg: 'rgba(245,158,11,0.15)', c: C.amber, bc: 'rgba(245,158,11,0.3)' }, geo: { bg: 'rgba(139,92,246,0.2)', c: C.purple, bc: 'rgba(139,92,246,0.3)' }, trade: { bg: 'rgba(6,182,212,0.15)', c: C.cyan, bc: 'rgba(6,182,212,0.3)' }, macro: { bg: 'rgba(59,130,246,0.2)', c: C.blue, bc: 'rgba(59,130,246,0.3)' }, energy: { bg: 'rgba(16,185,129,0.15)', c: C.green, bc: 'rgba(16,185,129,0.3)' } };
     return m[t] || m.macro;
@@ -808,6 +808,10 @@ export default function App() {
       const finnSymbol = SYMBOL_MAP[item.sym] || item.sym;
       try {
         const resp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${finnSymbol}&token=${FINNHUB_KEY}`);
+        if (resp.status === 429) {
+          console.warn(`Rate limit hit for ${item.sym}`);
+          return item;
+        }
         const d = await resp.json();
         if (d && d.c) {
           return { ...item, p: d.c, c: d.dp };
@@ -853,6 +857,7 @@ export default function App() {
   const fetchNews = useCallback(async () => {
     try {
       const resp = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`);
+      if (resp.status === 429) return;
       const data = await resp.json();
       if (Array.isArray(data)) {
         const mapped = data.slice(0, 15).map(n => ({
@@ -876,8 +881,8 @@ export default function App() {
       const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
       setTime(`${String(est.getHours()).padStart(2, '0')}:${String(est.getMinutes()).padStart(2, '0')}:${String(est.getSeconds()).padStart(2, '0')} EST`);
 
-      // Update market data every 30 seconds
-      if (now.getSeconds() % 30 === 0) {
+      // Update market data every 60 seconds (staying within Finnhub free tier 60/min limit)
+      if (now.getSeconds() === 0) {
         fetchAllMarketData();
       }
       // Update news every 5 minutes
@@ -950,19 +955,19 @@ export default function App() {
     );
     if (view === 'macro') return (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
-        <PanelShell title="MACRO INDICATORS — GLOBAL" actions={[{ label: 'LIVE', active: true }]}><MacroPanel /></PanelShell>
+        <PanelShell title="MACRO INDICATORS — GLOBAL" actions={[{ label: 'LIVE', active: true }]}><MacroPanel macro={macro} /></PanelShell>
         <PanelShell title="YIELD CURVES — US TREASURY" actions={[{ label: 'SPOT', active: true }, { label: '1W AGO' }, { label: '1M AGO' }]}><YieldCurvePanel /></PanelShell>
         <PanelShell title="CREDIT SPREADS & RATES"><SpreadsPanel /></PanelShell>
         <PanelShell title="SECTOR PERFORMANCE"><SectorPanel /></PanelShell>
         <PanelShell title="ORDER FLOW SENTIMENT" actions={[{ label: 'LIVE', active: true }]}><FlowPanel /></PanelShell>
-        <PanelShell title="LIVE NEWS" actions={[{ label: 'MACRO', active: true }]}><NewsPanel /></PanelShell>
+        <PanelShell title="LIVE NEWS" actions={[{ label: 'MACRO', active: true }]}><NewsPanel news={news} /></PanelShell>
       </div>
     );
     if (view === 'geopolitical') return (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
         <PanelShell title="GEOPOLITICAL RISK MATRIX"><GeoPanel /></PanelShell>
-        <PanelShell title="LIVE NEWS — GEO & POLICY" actions={[{ label: 'GEO', active: true }, { label: 'POLICY' }, { label: 'TRADE' }]}><NewsPanel /></PanelShell>
-        <PanelShell title="MACRO IMPACT TRACKER"><MacroPanel /></PanelShell>
+        <PanelShell title="LIVE NEWS — GEO & POLICY" actions={[{ label: 'GEO', active: true }, { label: 'POLICY' }, { label: 'TRADE' }]}><NewsPanel news={news} /></PanelShell>
+        <PanelShell title="MACRO IMPACT TRACKER"><MacroPanel macro={macro} /></PanelShell>
         <PanelShell title="COMMODITY & ENERGY EXPOSURE"><MktTable items={comm} /></PanelShell>
       </div>
     );
@@ -978,8 +983,8 @@ export default function App() {
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
         <PanelShell title="YIELD CURVES — GLOBAL" actions={[{ label: 'US', active: true }, { label: 'EU' }, { label: 'JP' }]}><YieldCurvePanel /></PanelShell>
         <PanelShell title="CREDIT SPREADS" actions={[{ label: 'IG', active: true }, { label: 'HY' }, { label: 'EM' }]}><SpreadsPanel /></PanelShell>
-        <PanelShell title="MACRO INDICATORS"><MacroPanel /></PanelShell>
-        <PanelShell title="FIXED INCOME NEWS" actions={[{ label: 'RATES', active: true }]}><NewsPanel /></PanelShell>
+        <PanelShell title="MACRO INDICATORS"><MacroPanel macro={macro} /></PanelShell>
+        <PanelShell title="FIXED INCOME NEWS" actions={[{ label: 'RATES', active: true }]}><NewsPanel news={news} /></PanelShell>
       </div>
     );
     if (view === 'flow') return (
@@ -989,7 +994,7 @@ export default function App() {
         <PanelShell title="OPTIONS FLOW"><OptionsPanel spot={spot} /></PanelShell>
         <PanelShell title="CRYPTO FLOW"><MktTable items={crypto} /></PanelShell>
         <PanelShell title="FX FLOW"><MktTable items={fx} /></PanelShell>
-        <PanelShell title="NEWS FLOW" actions={[{ label: 'BREAKING', active: true }]}><NewsPanel /></PanelShell>
+        <PanelShell title="NEWS FLOW" actions={[{ label: 'BREAKING', active: true }]}><NewsPanel news={news} /></PanelShell>
       </div>
     );
     if (view === 'ai') return (
@@ -997,7 +1002,7 @@ export default function App() {
         <PanelShell title="AI QUANTITATIVE ANALYSIS ENGINE v2.0" style={{ overflow: 'hidden' }} actions={[{ label: 'CLAUDE SONNET', active: true }, { label: '● LIVE DATA' }, { label: '⌖ WEB SEARCH' }]}>
           <AIPanel eq={eq} fx={fx} comm={comm} crypto={crypto} />
         </PanelShell>
-        <PanelShell title="LIVE CONTEXT"><NewsPanel /></PanelShell>
+        <PanelShell title="LIVE CONTEXT"><NewsPanel news={news} /></PanelShell>
       </div>
     );
   };
