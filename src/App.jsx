@@ -787,6 +787,7 @@ const SYMBOL_MAP = {
 };
 
 export default function App() {
+  console.log('QTERM_APP: Initializing main component');
   const [view, setView] = useState('overview');
   const [cmd, setCmd] = useState('');
   const [time, setTime] = useState('');
