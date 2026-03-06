@@ -659,23 +659,43 @@ ${isStrat ? '\n📈 STRATEGY MODE: Include entry/exit rules, position sizing, ri
 ${isRisk ? '\n⚠ RISK MODE: Provide quantitative metrics, formulas, limitations, and real-world context.' : ''}`;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages: newConv,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }]
-        })
-      });
+      // Use v1 for stable release, gemini-2.5-pro as primary
+      let baseUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`;
 
-      const data = await response.json();
+      const makeRequest = async (url) => {
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: systemPrompt }] },
+              ...newConv.map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+              }))
+            ],
+            generationConfig: {
+              maxOutputTokens: 2048,
+              temperature: 0.7,
+            }
+          })
+        });
+      };
+
+      let resp = await makeRequest(baseUrl);
+
+      // If Pro fails (sometimes happens with specific API keys/quotas), fallback to Flash
+      if (resp.status !== 200) {
+        console.warn('Gemini Pro failed, attempting fallback to Flash...');
+        baseUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        resp = await makeRequest(baseUrl);
+      }
+
+      const data = await resp.json();
       if (data.error) throw new Error(data.error.message);
 
-      const fullText = data.content.map(b => b.type === 'text' ? b.text : '').filter(Boolean).join('\n');
-      if (!fullText) throw new Error('Empty response');
+      const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!fullText) throw new Error('Empty response from Gemini');
 
       const updatedConv = [...newConv, { role: 'assistant', content: fullText }];
       setConversation(updatedConv);
@@ -725,8 +745,8 @@ ${isRisk ? '\n⚠ RISK MODE: Provide quantitative metrics, formulas, limitations
       <div ref={responseRef} style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
         {conversation.length === 0 ? (
           <div style={{ padding: '12px 14px', fontFamily: S.mono, fontSize: 10, lineHeight: 1.8, color: C.t2, whiteSpace: 'pre' }}>
-            <span style={{ color: C.amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>▶ QTERM QUANTITATIVE ANALYSIS ENGINE v2.0{'\n'}</span>
-            <span style={{ color: C.t3 }}>Powered by Claude Sonnet · Real-time web search · Live market data{'\n\n'}</span>
+            <span style={{ color: C.amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>▶ QTERM QUANTITATIVE ANALYSIS ENGINE v2.5{'\n'}</span>
+            <span style={{ color: C.t3 }}>Powered by Gemini 2.5 Pro · Hybrid Reasoning · Live market data{'\n\n'}</span>
             <span style={{ color: C.cyan, fontWeight: 700 }}>COVERAGE:{'\n'}</span>
             {'  ◆ Market Data — stationarity, regime detection, cointegration, data cleaning\n  ◆ Strategies — mean reversion, pairs trading, momentum, stat arb, ML alpha\n  ◆ Risk — VaR, CVaR, drawdown, stress testing, tail risk, vol clustering\n  ◆ Statistics — GARCH, Monte Carlo, Brownian motion, PCA, cointegration\n  ◆ Portfolio — Markowitz, risk parity, factor models, shrinkage, rebalancing\n  ◆ Python Code — complete runnable implementations for all quant tasks\n  ◆ Interviews — Black-Scholes, derivatives pricing, microstructure, slippage\n  ◆ Stress Tests — backtest failure, alpha decay, overfitting diagnosis\n  ◆ Live Markets — cross-asset macro, geopolitical impact, real-time synthesis\n\n'}
             <span style={{ color: C.t4 }}>Select a category above → click a question → or type below{'\n'}</span>
@@ -772,7 +792,8 @@ ${isRisk ? '\n⚠ RISK MODE: Provide quantitative metrics, formulas, limitations
 // ═══════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════
-const FINNHUB_KEY = 'd6k5ta9r01qko8c3hfpgd6k5ta9r01qko8c3hfq0';
+const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const SYMBOL_MAP = {
   'SPX': 'SPY', 'NDX': 'QQQ', 'DJIA': 'DIA', 'RUT': 'IWM',
@@ -1000,7 +1021,7 @@ export default function App() {
     );
     if (view === 'ai') return (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 300px', gridTemplateRows: '1fr', gap: 1, background: C.border, overflow: 'hidden' }}>
-        <PanelShell title="AI QUANTITATIVE ANALYSIS ENGINE v2.0" style={{ overflow: 'hidden' }} actions={[{ label: 'CLAUDE SONNET', active: true }, { label: '● LIVE DATA' }, { label: '⌖ WEB SEARCH' }]}>
+        <PanelShell title="AI QUANTITATIVE ANALYSIS ENGINE v2.5" style={{ overflow: 'hidden' }} actions={[{ label: 'GEMINI 2.5 PRO', active: true }, { label: '● LIVE DATA' }, { label: '⌖ HYBRID SEARCH' }]}>
           <AIPanel eq={eq} fx={fx} comm={comm} crypto={crypto} />
         </PanelShell>
         <PanelShell title="LIVE CONTEXT"><NewsPanel news={news} /></PanelShell>
