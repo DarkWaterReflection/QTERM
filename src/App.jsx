@@ -617,6 +617,13 @@ function AIPanel({ eq, fx, comm, crypto }) {
   const runQuery = useCallback(async (q) => {
     const text = (q || query).trim();
     if (!text || loading) return;
+
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'undefined') {
+      setConversation([...conversation, { role: 'user', content: text }, { role: 'error', content: 'Gemini API Key is missing. Please set VITE_GEMINI_API_KEY in your environment variables (e.g., .env or Vercel Settings).' }]);
+      setQuery('');
+      return;
+    }
+
     setQuery('');
     setLoading(true);
 
